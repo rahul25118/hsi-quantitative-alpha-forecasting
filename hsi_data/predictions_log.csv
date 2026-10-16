@@ -1,0 +1,2 @@
+Run_Timestamp,Observation_Date,Target_Trading_Date,Current_Close,Predicted_Close,Predicted_Return_Pct,Predicted_Direction,Prob_UP,Prob_DOWN,Range_80_Lower,Range_80_Upper,Confidence,Realized_Close,Actual_Direction,Directional_Hit,Absolute_Error_Pts
+2026-10-16 11:58:15,2026-10-16,2026-10-17,24186.830078125,24172.42945497722,-0.05955684066495383,DOWN,47.723506954925654,52.276493045074346,23820.96415728092,24529.08043091346,MEDIUM,,,,
