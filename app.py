@@ -4,49 +4,59 @@ import numpy as np
 import yfinance as yf
 import plotly.express as px
 from datetime import datetime
-import os
 
 st.set_page_config(
-    page_title="Multi-Index Intraday Decimal Analytics",
-    page_icon="📊",
+    page_title="Index Decimal Analytics: 12-1 PM Unique vs Common",
+    page_icon="🎯",
     layout="wide"
 )
 
-st.title("📊 Multi-Index Decimal & Intraday Dynamics")
-st.caption("Live Monitoring, Cross-Timeframe Intersections & Historical Audits for NSE Nifty 50 and HKEX Hang Seng")
+# ऑटो-रीफ्रेश (हर 20 सेकंड में लाइव अपडेट)
+try:
+    from streamlit_autorefresh import st_autorefresh
+    st_autorefresh(interval=20 * 1000, key="auto_refresh_tick")
+except Exception:
+    pass
+
+st.title("🎯 Index Decimal Dynamics: 12:00-01:00 PM Window Analytics")
+st.caption("Live Unique (1x) vs Common (2x+) Frequency Breakdown & Closing Decimal Audit for NIFTY 50 and HSI")
 
 # ---------------------------------------------------------
-# साइडबार: इंडेक्स और सेटिंग्स
+# साइडबार कॉन्फ़िगरेशन
 # ---------------------------------------------------------
-st.sidebar.header("⚙️ कॉन्फ़िगरेशन")
-selected_market = st.sidebar.selectbox(
+st.sidebar.header("⚙️ इंडेक्स चयन")
+market_choice = st.sidebar.selectbox(
     "इंडेक्स चुनें:",
     ["NIFTY 50 (India - NSE)", "Hang Seng Index (Hong Kong - HKEX)"],
     index=0
 )
 
-is_nifty = "NIFTY" in selected_market
-ticker = "^NSEI" if is_nifty else "^HSI"
-tz_name = "Asia/Kolkata" if is_nifty else "Asia/Hong_Kong"
-
-timeframe_map = {
-    "1-Minute": "1min",
-    "5-Minute": "5min",
-    "15-Minute": "15min",
-    "30-Minute": "30min",
-    "1-Hour": "1h",
-    "2-Hour": "2h"
-}
+is_nifty = "NIFTY" in market_choice
+ticker_symbol = "^NSEI" if is_nifty else "^HSI"
+backup_symbol = "NIFTYBEES.NS" if is_nifty else "HSI=F"
+tz_name = "Asia/Kolkata"  # दोनों के लिए 12-1 PM IST तुलना
 
 # ---------------------------------------------------------
-# डेटा लोडर (कैश 15 सेकंड)
+# डेटा लोडर (Zero-Delay Fast Info + 1m Bars)
 # ---------------------------------------------------------
-@st.cache_data(ttl=15)
-def load_market_data(ticker_symbol, tz):
-    df = yf.download(ticker_symbol, period="7d", interval="1m", progress=False)
-    if df.empty or len(df) < 50:
-        backup = "NIFTYBEES.NS" if "^NSEI" in ticker_symbol else "HSI=F"
-        df = yf.download(backup, period="7d", interval="1m", progress=False)
+@st.cache_data(ttl=10)
+def load_market_data(primary_tk, backup_tk, tz):
+    t = yf.Ticker(primary_tk)
+    live_price = None
+    try:
+        live_price = t.fast_info.get("last_price")
+    except Exception:
+        pass
+
+    if live_price is None:
+        try:
+            live_price = yf.Ticker(backup_tk).fast_info.get("last_price")
+        except Exception:
+            pass
+
+    df = yf.download(primary_tk, period="7d", interval="1m", progress=False)
+    if df.empty or len(df) < 30:
+        df = yf.download(backup_tk, period="7d", interval="1m", progress=False)
 
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
@@ -56,169 +66,166 @@ def load_market_data(ticker_symbol, tz):
     else:
         df.index = df.index.tz_convert(tz)
 
+    if live_price is not None and not df.empty:
+        last_rec = df["Close"].iloc[-1]
+        now_time = pd.Timestamp.now(tz=tz)
+        if (now_time - df.index[-1]).total_seconds() > 60 or abs(live_price - last_rec) > 0.001:
+            inject_bar = pd.DataFrame([{
+                "Open": live_price, "High": live_price, "Low": live_price,
+                "Close": live_price, "Volume": 0
+            }], index=[now_time])
+            df = pd.concat([df, inject_bar])
+
     df["Date"] = df.index.date
     df["Decimal"] = df["Close"].apply(lambda x: f"{float(x):.2f}".split(".")[1].zfill(2))
     return df
 
-with st.spinner(f"{ticker} का इंट्राडे डेटा लोड हो रहा है..."):
+with st.spinner(f"{ticker_symbol} का डेटा लोड हो रहा है..."):
     try:
-        df_1m = load_market_data(ticker, tz_name)
+        df_1m = load_market_data(ticker_symbol, backup_symbol, tz_name)
     except Exception as e:
-        st.error(f"डेटा लोड करने में त्रुटि: {e}")
+        st.error(f"डेटा लोड त्रुटि: {e}")
         st.stop()
 
 available_dates = sorted(df_1m["Date"].unique(), reverse=True)
-selected_date = st.sidebar.selectbox("ट्रेडिंग सत्र चुनें:", available_dates, index=0)
+selected_date = st.sidebar.selectbox("सत्र चुनें:", available_dates, index=0)
 
-day_1m = df_1m[df_1m["Date"] == selected_date].copy()
-if day_1m.empty:
-    st.warning("चुने गए दिन के लिए पर्याप्त डेटा उपलब्ध नहीं है।")
+day_df = df_1m[df_1m["Date"] == selected_date].copy()
+if day_df.empty:
+    st.warning("सत्र का डेटा उपलब्ध नहीं है।")
     st.stop()
 
-latest_row = day_1m.iloc[-1]
-latest_price = latest_row["Close"]
-latest_decimal = latest_row["Decimal"]
-latest_time = day_1m.index[-1].strftime("%H:%M:%S")
+actual_close_price = day_df.iloc[-1]["Close"]
+actual_close_dec = day_df.iloc[-1]["Decimal"]
+latest_time = day_df.index[-1].strftime("%H:%M:%S")
 
-col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-col_m1.metric("अंतिम रिकॉर्डेड भाव", f"{latest_price:.2f}")
-col_m2.metric("अंतिम दशमलव", f".{latest_decimal}")
-col_m3.metric(f"अंतिम समय ({tz_name.split('/')[1]})", latest_time)
-col_m4.metric("कुल 1-मिनट बार्स", f"{len(day_1m)}")
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("अंतिम भाव", f"{actual_close_price:.2f}")
+col2.metric("क्लोजिंग दशमलव", f".{actual_close_dec}")
+col3.metric("अंतिम टिक समय (IST)", latest_time)
+col4.metric("सत्र के कुल 1-मिनट बार्स", f"{len(day_df)}")
 
 st.markdown("---")
 
-tab1, tab2, tab3 = st.tabs(["📡 मल्टी-टाइमफ्रेम मैट्रिक्स", "🎯 ऐतिहासिक क्लोज-मैच ऑडिट", "🔬 टाइमफ्रेम डीप-डाइव"])
+tab1, tab2 = st.tabs(["🔍 12:00-01:00 PM विंडो विश्लेषण", "📊 7-दिवसीय तुलनात्मक ऑडिट"])
 
 # =========================================================
-# TAB 1: मल्टी-टाइमफ्रेम मैट्रिक्स और कॉमन इंटरसेक्शन
+# TAB 1: 12:00 से 01:00 PM विंडो विश्लेषण
 # =========================================================
 with tab1:
-    st.subheader(f"📊 मल्टी-टाइमफ्रेम बारंबारता सारांश ({selected_date})")
+    st.subheader(f"📅 तारीख: {selected_date} (12:00 PM से 01:00 PM IST विंडो)")
+    win_df = day_df.between_time("12:00:00", "13:00:00")
 
-    tf_summaries = []
-    resampled_dict = {}
-    sets_dict = {}
+    if win_df.empty:
+        st.warning("इस सत्र में 12:00 से 01:00 PM के बीच कोई कैंडल्स उपलब्ध नहीं हैं।")
+    else:
+        counts = win_df["Decimal"].value_counts()
+        single_unique = sorted(list(counts[counts == 1].index))
+        common_series = counts[counts > 1]
 
-    for tf_name, tf_code in timeframe_map.items():
-        if tf_code == "1min":
-            df_tf = day_1m.copy()
+        avg_f = common_series.mean() if not common_series.empty else 0
+        super_common = common_series[common_series > avg_f]
+
+        close_in_win = actual_close_dec in counts.index
+        close_freq = counts.get(actual_close_dec, 0)
+        ranked = list(counts.index)
+        close_rank = f"#{ranked.index(actual_close_dec) + 1}" if close_in_win else "विंडो से बाहर (0 बार)"
+
+        if not close_in_win:
+            match_status = "❌ क्लोजिंग दशमलव 12-1 की विंडो में था ही नहीं"
+            status_color = "error"
+        elif actual_close_dec in super_common.index:
+            match_status = f"★ हाई-फ़्रीक्वेंसी कॉमन पूल में था ({close_freq} बार आया था)"
+            status_color = "success"
+        elif actual_close_dec in common_series.index:
+            match_status = f"✓ सामान्य कॉमन पूल में था ({close_freq} बार आया था)"
+            status_color = "info"
         else:
-            df_tf = day_1m.resample(tf_code).agg({
-                "Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum"
-            }).dropna()
-            df_tf["Decimal"] = df_tf["Close"].apply(lambda x: f"{float(x):.2f}".split(".")[1].zfill(2))
+            match_status = "• सिंगल यूनिक पूल में था (सिर्फ 1 बार आया था)"
+            status_color = "warning"
 
-        resampled_dict[tf_name] = df_tf
-        n_bars = len(df_tf)
-        if n_bars == 0:
-            continue
-
-        counts = df_tf["Decimal"].value_counts()
-        sets_dict[tf_name] = set(counts.index)
-
-        top1_dec = counts.index[0]
-        top1_freq = counts.iloc[0]
-        curr_freq = counts.get(latest_decimal, 0)
-        rank_list = list(counts.index)
-        curr_rank = f"#{rank_list.index(latest_decimal)+1}" if latest_decimal in rank_list else "Not Seen"
-
-        total_possible = 20 if is_nifty else 100
-
-        tf_summaries.append({
-            "Timeframe": tf_name,
-            "Total_Bars": n_bars,
-            "Unique_Decimals": f"{len(counts)} / {total_possible}",
-            "Top-1_Mode": f".{top1_dec} ({top1_freq}x)",
-            "Current_Dec_Freq": f"{curr_freq} बार",
-            "Current_Dec_Rank": curr_rank
-        })
-
-    st.dataframe(pd.DataFrame(tf_summaries), use_container_width=True)
-
-    st.markdown("#### 🔗 सभी टाइमफ्रेम्स में कॉमन दशमलव (Cross-Timeframe Intersection)")
-    valid_sets = [s for s in sets_dict.values() if len(s) > 0]
-    if valid_sets:
-        common_all = set.intersection(*valid_sets)
-        formatted_common = [f".{d}" for d in sorted(common_all)]
-        st.success(f"सभी टाइमफ्रेम्स में कॉमन दशमलव ({len(common_all)}): **{', '.join(formatted_common)}**")
-
-# =========================================================
-# TAB 2: ऐतिहासिक क्लोजिंग मैच टेस्ट
-# =========================================================
-with tab2:
-    st.subheader(f"🧪 हिस्टोरिकल क्लोज-मैच ऑडिट ({selected_market})")
-
-    audit_results = []
-
-    for tf_name, tf_code in timeframe_map.items():
-        if tf_code == "1min":
-            df_full_tf = df_1m.copy()
+        if status_color == "success":
+            st.success(f"**क्लोजिंग परिणाम:** .{actual_close_dec} | रैंक: {close_rank} | {match_status}")
+        elif status_color == "info":
+            st.info(f"**क्लोजिंग परिणाम:** .{actual_close_dec} | रैंक: {close_rank} | {match_status}")
+        elif status_color == "warning":
+            st.warning(f"**क्लोजिंग परिणाम:** .{actual_close_dec} | रैंक: {close_rank} | {match_status}")
         else:
-            df_full_tf = df_1m.resample(tf_code).agg({
-                "Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum"
-            }).dropna()
-            df_full_tf["Date"] = df_full_tf.index.date
-            df_full_tf["Decimal"] = df_full_tf["Close"].apply(lambda x: f"{float(x):.2f}".split(".")[1].zfill(2))
+            st.error(f"**क्लोजिंग परिणाम:** .{actual_close_dec} | {match_status}")
 
-        dates_list = sorted(df_full_tf["Date"].unique())
-        hits_top1, hits_top5, hits_top10, hits_top20, total_days = 0, 0, 0, 0, 0
-        bars_count = []
+        c_u, c_c, c_h = st.columns(3)
+        c_u.metric("यूनिक दशमलव (1 बार आए)", len(single_unique))
+        c_c.metric("कॉमन दशमलव (2+ बार आए)", len(common_series))
+        c_h.metric("हाई-फ़्रीक्वेंसी दशमलव", len(super_common))
 
-        for d in dates_list:
-            day_slice = df_full_tf[df_full_tf["Date"] == d]
-            if len(day_slice) < 4:
-                continue
-            total_days += 1
-            bars_count.append(len(day_slice))
-            close_dec = day_slice.iloc[-1]["Decimal"]
-            counts = day_slice["Decimal"].value_counts()
-            ranked = list(counts.index)
+        st.markdown("#### 1. शुद्ध यूनिक दशमलव (Only 1x):")
+        st.code(", ".join([f".{d}" for d in single_unique]) if single_unique else "कोई नहीं")
 
-            if close_dec in ranked:
-                r = ranked.index(close_dec) + 1
-                if r == 1: hits_top1 += 1
-                if r <= 5: hits_top5 += 1
-                if r <= 10: hits_top10 += 1
-                if r <= 20: hits_top20 += 1
-
-        if total_days > 0:
-            audit_results.append({
-                "Timeframe": tf_name,
-                "Avg_Bars/Day": int(np.mean(bars_count)),
-                "Tested_Days": total_days,
-                "Top-01 Hit Rate": f"{(hits_top1/total_days)*100:.1f}% ({hits_top1}/{total_days})",
-                "Top-05 Hit Rate": f"{(hits_top5/total_days)*100:.1f}% ({hits_top5}/{total_days})",
-                "Top-10 Hit Rate": f"{(hits_top10/total_days)*100:.1f}% ({hits_top10}/{total_days})",
-                "Top-20 Hit Rate": f"{(hits_top20/total_days)*100:.1f}% ({hits_top20}/{total_days})"
+        st.markdown("#### 2. कॉमन दशमलव (2x या अधिक):")
+        if not common_series.empty:
+            common_df = pd.DataFrame({
+                "दशमलव": [f".{k}" for k in common_series.index],
+                "बारंबारता (Frequency)": common_series.values,
+                "श्रेणी": ["★ हाई-फ़्रीक्वेंसी" if k in super_common.index else "सामान्य कॉमन" for k in common_series.index]
             })
+            st.dataframe(common_df, use_container_width=True, height=250)
 
-    st.dataframe(pd.DataFrame(audit_results), use_container_width=True)
-
-# =========================================================
-# TAB 3: टाइमफ्रेम डीप-डाइव
-# =========================================================
-with tab3:
-    st.subheader("🔍 टाइमफ्रेम अनुसार विस्तृत बारंबारता")
-    selected_tf_view = st.selectbox("टाइमफ्रेम चुनें:", list(timeframe_map.keys()), index=1)
-
-    df_view = resampled_dict.get(selected_tf_view, pd.DataFrame())
-    if not df_view.empty:
-        col_t1, col_t2 = st.columns([1, 1])
-
-        with col_t1:
-            st.markdown(f"**{selected_tf_view} पर सबसे ज़्यादा बार आए दशमलव:**")
-            counts_v = df_view["Decimal"].value_counts().reset_index()
-            counts_v.columns = ["Decimal", "Frequency"]
-            counts_v["Decimal"] = counts_v["Decimal"].apply(lambda x: f".{x}")
-
-            fig = px.bar(counts_v.head(15), x="Decimal", y="Frequency", color="Frequency",
-                         title=f"Top Decimals on {selected_tf_view}",
-                         color_continuous_scale="Viridis")
+            fig = px.bar(
+                common_df.head(15), x="दशमलव", y="बारंबारता (Frequency)", color="श्रेणी",
+                title="12:00-01:00 PM के टॉप कॉमन दशमलव",
+                color_discrete_map={"★ हाई-फ़्रीक्वेंसी": "#00CC96", "सामान्य कॉमन": "#636EFA"}
+            )
             st.plotly_chart(fig, use_container_width=True)
 
-        with col_t2:
-            st.markdown(f"**{selected_tf_view} कैंडल्स का क्रमवार विवरण:**")
-            log_view = df_view[["Open", "High", "Low", "Close", "Decimal"]].copy()
-            log_view.index = log_view.index.strftime("%H:%M")
-            st.dataframe(log_view, height=350, use_container_width=True)
+# =========================================================
+# TAB 2: 7-दिवसीय ऑडिट टेबल
+# =========================================================
+with tab2:
+    st.subheader(f"📊 7-दिवसीय क्लोजिंग मैच ऑडिट ({market_choice})")
+
+    audit_rows = []
+    for d in sorted(df_1m["Date"].unique()):
+        sub_d = df_1m[df_1m["Date"] == d]
+        if len(sub_d) < 40:
+            continue
+        c_dec = sub_d.iloc[-1]["Decimal"]
+        w_df = sub_d.between_time("12:00:00", "13:00:00")
+        if w_df.empty:
+            continue
+
+        w_counts = w_df["Decimal"].value_counts()
+        w_single = w_counts[w_counts == 1]
+        w_common = w_counts[w_counts > 1]
+        w_avg = w_common.mean() if not w_common.empty else 0
+        w_super = w_common[w_common > w_avg]
+
+        freq = w_counts.get(c_dec, 0)
+        ranked = list(w_counts.index)
+        rk = f"#{ranked.index(c_dec) + 1}" if c_dec in ranked else "विंडो से बाहर"
+
+        if freq == 0:
+            b_label = "❌ दिखा ही नहीं"
+        elif c_dec in w_super.index:
+            b_label = "★ हाई-फ़्रीक्वेंसी"
+        elif c_dec in w_common.index:
+            b_label = "✓ सामान्य कॉमन"
+        else:
+            b_label = "• सिंगल यूनिक"
+
+        top1 = f".{w_counts.index[0]} ({w_counts.iloc[0]}x)"
+        top1_match = "✓ हाँ" if c_dec == w_counts.index[0] else "✗ नहीं"
+
+        audit_rows.append({
+            "तारीख": str(d),
+            "क्लोजिंग दशमलव": f".{c_dec}",
+            "12-1 टॉप मोड": top1,
+            "टॉप मोड मैच?": top1_match,
+            "12-1 बारंबारता": f"{freq} बार",
+            "रैंक": rk,
+            "क्लोजिंग श्रेणी": b_label,
+            "यूनिक संख्या": len(w_single),
+            "कॉमन संख्या": len(w_common)
+        })
+
+    df_audit = pd.DataFrame(audit_rows)
+    st.dataframe(df_audit, use_container_width=True)
