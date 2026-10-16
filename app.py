@@ -5,16 +5,16 @@ import numpy as np
 from datetime import datetime
 import pytz
 
-st.set_page_config(page_title="Decimal Tracker: NIFTY, HSI & TAIEX", layout="wide")
-st.title("🎯 Multi-Index Decimal Tracker & Historical Audit Engine")
-st.caption("NIFTY 50 (भारत), HANG SENG (हांगकांग) और TAIEX (ताइवान) के मिड-डे दशमलव व क्लोजिंग का विश्लेषण।")
+st.set_page_config(page_title="Decimal Tracker: Top-15 & Pool Audit", layout="wide")
+st.title("🎯 Multi-Index Decimal Tracker: Top-15 Priority Engine")
+st.caption("शीर्ष 15 सबसे सक्रिय दशमलव ऊपर दिखाए गए हैं, तथा नीचे कॉमन, यूनिक और अनसीन के संपूर्ण पूल्स उपलब्ध हैं।")
 
 # साइडबार
 st.sidebar.header("⚙️ सेटिंग्स")
 index_choice = st.sidebar.selectbox("इंडेक्स चुनें:", ["NIFTY 50", "HANG SENG", "TAIEX (Taiwan)"])
 ist = pytz.timezone("Asia/Kolkata")
 now_ist = datetime.now(ist)
-st.sidebar.info(f"🕒 वर्तमान IST: {now_ist.strftime('%Y-%m-%d %H:%M:%S')}")
+st.sidebar.info(f"🕒 वर्तमान IST समय: {now_ist.strftime('%Y-%m-%d %H:%M:%S')}")
 
 if index_choice == "NIFTY 50":
     ticker_primary = "^NSEI"
@@ -30,11 +30,10 @@ elif index_choice == "HANG SENG":
     win_start, win_end = "12:00:00", "13:00:00"
     close_time_str = "15:25:00"
     window_label = "12:00–01:00 PM IST"
-else:  # TAIEX (ताइवान)
+else:  # TAIEX (Taiwan)
     ticker_primary = "^TWII"
-    ticker_backup = "0050.TW"  # Yuanta Taiwan Top 50 ETF
+    ticker_backup = "0050.TW"
     total_possible = 100
-    # ताइवान लंच ऑवर: 11:00-12:00 स्थानीय = 08:30-09:30 AM IST (मार्केट क्लोज़ 11:00 AM IST)
     win_start, win_end = "08:30:00", "09:30:00"
     close_time_str = "10:55:00"
     window_label = "08:30–09:30 AM IST (11:00–12:00 ताइवान समय)"
@@ -59,13 +58,13 @@ def fetch_multi_day_data(primary, backup):
 df_all = fetch_multi_day_data(ticker_primary, ticker_backup)
 
 if df_all.empty:
-    st.error(f"{index_choice} का डेटा फेच करने में समस्या आ रही है। कृपया पुनः प्रयास करें।")
+    st.error(f"{index_choice} का डेटा लोड नहीं हो सका।")
     st.stop()
 
 available_dates = sorted(df_all["Date"].unique(), reverse=True)
 
 selected_date = st.sidebar.selectbox(
-    "📅 तारीख चुनें (दैनिक विश्लेषण):",
+    "📅 तारीख चुनें (सत्र विश्लेषण):",
     available_dates,
     index=0
 )
@@ -77,10 +76,14 @@ st.subheader(f"📊 सत्र विश्लेषण: {selected_date} ({ind
 st.info(f"📌 विश्लेषण विंडो: **{window_label}**")
 
 if len(win_df) < 5:
-    st.warning(f"⚠️ इस तारीख के लिए {window_label} विंडो का पर्याप्त डेटा उपलब्ध नहीं है।")
+    st.warning(f"⚠️ {window_label} विंडो का पर्याप्त डेटा अभी उपलब्ध नहीं हुआ है।")
 else:
     counts = win_df["Decimal"].value_counts()
-    top5_common = counts.head(5)
+
+    # 1. Top-15 प्रायोरिटी लिस्ट (फ़्रीक्वेंसी के अनुसार)
+    top15_common = counts.head(15)
+
+    # 2. सभी पूल्स
     common_pool = counts[counts >= 2]
     unique_pool = counts[counts == 1]
 
@@ -90,40 +93,63 @@ else:
         all_possible = [f"{x:02d}" for x in range(100)]
     unseen_pool = sorted(list(set(all_possible) - set(counts.index)))
 
-    st.markdown("### ⭐ विंडो के Top-5 डोमिनेंट नंबर")
-    cols = st.columns(5)
-    for i in range(5):
-        with cols[i]:
-            if i < len(top5_common):
-                dec_val = top5_common.index[i]
-                rep_cnt = top5_common.iloc[i]
-                st.metric(label=f"रैंक #{i+1}", value=f".{dec_val}", delta=f"{rep_cnt} बार आया")
-            else:
-                st.metric(label=f"रैंक #{i+1}", value="-", delta="N/A")
-
+    # =========================================================================
+    # ⭐ TOP-15 डोमिनेंट नंबर डिस्प्ले (3 पंक्तियों में 5-5 कार्ड्स)
+    # =========================================================================
     st.markdown("---")
+    st.markdown("### ⭐ विंडो के Top-15 प्राथमिकता नंबर (Top-15 Priority Decimals)")
+    st.caption("विंडो में सर्वाधिक बार रिकॉर्ड किए गए 15 दशमलव:")
+
+    for row_idx in range(3):
+        cols = st.columns(5)
+        for col_idx in range(5):
+            idx = row_idx * 5 + col_idx
+            with cols[col_idx]:
+                if idx < len(top15_common):
+                    dec_val = top15_common.index[idx]
+                    rep_cnt = top15_common.iloc[idx]
+                    st.metric(
+                        label=f"रैंक #{idx+1}",
+                        value=f".{dec_val}",
+                        delta=f"{rep_cnt} बार आया"
+                    )
+                else:
+                    st.metric(label=f"रैंक #{idx+1}", value="-", delta="उपलब्ध नहीं")
+
+    # =========================================================================
+    # 📋 नीचे सभी पूल्स का संपूर्ण विवरण
+    # =========================================================================
+    st.markdown("---")
+    st.markdown("### 📋 संपूर्ण पूल्स विभाजन (Complete Decimals Breakdown)")
+
     c1, c2, c3 = st.columns(3)
+
     with c1:
         st.markdown(f"#### 🔄 कॉमन पूल ({len(common_pool)} अंक)")
-        st.caption("विंडो में 2x या उससे अधिक बार आए:")
+        st.caption("विंडो में $\ge 2	imes$ रिपीट हुए:")
         if not common_pool.empty:
-            st.write(", ".join([f".{k} ({v}x)" for k, v in common_pool.items()]))
+            c_items = [f".{k} ({v}x)" for k, v in common_pool.items()]
+            st.write(", ".join(c_items))
         else:
             st.write("कोई कॉमन नंबर नहीं।")
 
     with c2:
         st.markdown(f"#### ⚡ यूनिक पूल ({len(unique_pool)} अंक)")
-        st.caption("विंडो में सिर्फ 1 बार आए:")
+        st.caption("विंडो में सिर्फ $1	imes$ आए:")
         if not unique_pool.empty:
-            st.write(", ".join([f".{k}" for k in sorted(unique_pool.index)]))
+            u_items = [f".{k}" for k in sorted(unique_pool.index)]
+            st.write(", ".join(u_items))
         else:
             st.write("कोई यूनिक नंबर नहीं।")
 
     with c3:
         st.markdown(f"#### 🚫 अनसीन पूल ({len(unseen_pool)} अंक)")
-        st.caption("विंडो में नहीं दिखे:")
+        st.caption("विंडो में एक बार भी नहीं दिखे (बाहर रहे):")
         st.write(", ".join([f".{k}" for k in unseen_pool]))
 
+    # =========================================================================
+    # 🏁 क्लोजिंग परिणाम सत्यापन
+    # =========================================================================
     st.markdown("---")
     last_bar_time = day_df.index[-1].time()
     is_today = (selected_date == datetime.now(ist).date())
@@ -133,20 +159,21 @@ else:
         close_price = day_df.iloc[-1]["Close"]
         close_dec = day_df.iloc[-1]["Decimal"]
 
-        if close_dec in top5_common.index:
-            res_tag = "✅ Top-5 कॉमन में मैच हुआ!"
-        elif close_dec in common_pool.index:
-            res_tag = "🟡 कॉमन पूल में आया (Top-5 से बाहर)"
-        elif close_dec in unique_pool.index:
-            res_tag = "🔵 यूनिक पूल में आया"
+        if close_dec in top15_common.index:
+            rank_hit = list(top15_common.index).index(close_dec) + 1
+            res_tag = f"✅ Top-15 में मैच हुआ! (रैंक #{rank_hit})"
+        elif close_dec in counts.index:
+            res_tag = "🟡 सीन पूल में आया (Top-15 से बाहर)"
         else:
             res_tag = "❌ अनसीन (विंडो के बाहर) गया"
 
-        st.success(f"**अंतिम क्लोजिंग भाव:** {close_price:.2f} (दशमलव: **.{close_dec}**) | **स्टेटस:** {res_tag}")
+        st.success(f"**03:30 PM क्लोजिंग भाव:** {close_price:.2f} (दशमलव: **.{close_dec}**) | **स्टेटस:** {res_tag}")
     else:
-        st.info("ℹ️ बाजार अभी खुला है या सत्र की अंतिम क्लोजिंग नहीं आई है।")
+        st.info("ℹ️ बाजार अभी खुला है या सत्र की अंतिम क्लोजिंग नहीं आई है। क्लोजिंग वेरिफिकेशन 03:30 PM पर एक्टिव होगा।")
 
-# 7-दिवसीय हिस्ट्री समरी
+# =========================================================================
+# 📅 7-दिवसीय पूर्ण ऐतिहासिक ऑडिट टेबल (History Table)
+# =========================================================================
 st.markdown("---")
 st.markdown("### 📋 पिछले 7 कारोबारी दिनों का समग्र सारांश")
 
@@ -161,16 +188,13 @@ for d in available_dates[:7]:
     c_price = d_df.iloc[-1]["Close"]
     w_counts = w_df["Decimal"].value_counts()
 
-    t5 = w_counts.head(5).index.tolist()
-    c_pool = w_counts[w_counts >= 2].index.tolist()
-    u_pool = w_counts[w_counts == 1].index.tolist()
+    t15 = w_counts.head(15).index.tolist()
 
-    if c_dec in t5:
-        outcome = "✅ Top-5 मैच"
-    elif c_dec in c_pool:
-        outcome = "🟡 कॉमन (Top-5 बाहर)"
-    elif c_dec in u_pool:
-        outcome = "🔵 यूनिक (1x)"
+    if c_dec in t15:
+        r_pos = t15.index(c_dec) + 1
+        outcome = f"✅ Top-15 मैच (रैंक #{r_pos})"
+    elif c_dec in w_counts.index:
+        outcome = "🟡 सीन (Top-15 बाहर)"
     else:
         outcome = "❌ अनसीन (बाहर)"
 
@@ -178,7 +202,7 @@ for d in available_dates[:7]:
         "तारीख": str(d),
         "क्लोजिंग भाव": f"{c_price:.2f}",
         "क्लोज दशमलव": f".{c_dec}",
-        "Top-5 कॉमन नंबर्स": ", ".join([f".{x}" for x in t5]),
+        "Top-15 नंबर्स": ", ".join([f".{x}" for x in t15]),
         "परिणाम": outcome
     })
 
