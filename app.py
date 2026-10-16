@@ -5,9 +5,9 @@ import numpy as np
 from datetime import datetime
 import pytz
 
-st.set_page_config(page_title="Decimal Tracker: Top-15 & Pool Audit", layout="wide")
-st.title("🎯 Multi-Index Decimal Tracker: Top-15 Priority Engine")
-st.caption("शीर्ष 15 सबसे सक्रिय दशमलव ऊपर दिखाए गए हैं, तथा नीचे कॉमन, यूनिक और अनसीन के संपूर्ण पूल्स उपलब्ध हैं।")
+st.set_page_config(page_title="Decimal Tracker: NIFTY, HSI & TAIEX", layout="wide")
+st.title("🎯 Multi-Index Decimal Tracker: Pre-Close 1-Hour Engine")
+st.caption("NIFTY (02:00–03:00 PM IST), HANG SENG (12:00–01:00 PM IST) और TAIEX के अंतिम 1-घंटे की विंडो का विश्लेषण।")
 
 # साइडबार
 st.sidebar.header("⚙️ सेटिंग्स")
@@ -20,23 +20,23 @@ if index_choice == "NIFTY 50":
     ticker_primary = "^NSEI"
     ticker_backup = "NIFTYBEES.NS"
     total_possible = 20
-    win_start, win_end = "12:00:00", "13:00:00"
+    win_start, win_end = "14:00:00", "15:00:00"  # 02:00 से 03:00 PM IST
     close_time_str = "15:25:00"
-    window_label = "12:00–01:00 PM IST"
+    window_label = "02:00–03:00 PM IST (क्लोजिंग 03:30 PM)"
 elif index_choice == "HANG SENG":
     ticker_primary = "^HSI"
     ticker_backup = "2800.HK"
     total_possible = 100
-    win_start, win_end = "12:00:00", "13:00:00"
-    close_time_str = "15:25:00"
-    window_label = "12:00–01:00 PM IST"
+    win_start, win_end = "12:00:00", "13:00:00"  # 12:00 से 01:00 PM IST
+    close_time_str = "13:25:00"                  # 01:30 PM IST क्लोज
+    window_label = "12:00–01:00 PM IST (क्लोजिंग 01:30 PM)"
 else:  # TAIEX (Taiwan)
     ticker_primary = "^TWII"
     ticker_backup = "0050.TW"
     total_possible = 100
-    win_start, win_end = "08:30:00", "09:30:00"
-    close_time_str = "10:55:00"
-    window_label = "08:30–09:30 AM IST (11:00–12:00 ताइवान समय)"
+    win_start, win_end = "09:30:00", "10:30:00"  # 09:30 से 10:30 AM IST
+    close_time_str = "10:55:00"                  # 11:00 AM IST क्लोज
+    window_label = "09:30–10:30 AM IST (क्लोजिंग 11:00 AM)"
 
 @st.cache_data(ttl=60)
 def fetch_multi_day_data(primary, backup):
@@ -80,10 +80,10 @@ if len(win_df) < 5:
 else:
     counts = win_df["Decimal"].value_counts()
 
-    # 1. Top-15 प्रायोरिटी लिस्ट (फ़्रीक्वेंसी के अनुसार)
+    # 1. Top-15 प्रायोरिटी लिस्ट
     top15_common = counts.head(15)
 
-    # 2. सभी पूल्स
+    # 2. पूल्स
     common_pool = counts[counts >= 2]
     unique_pool = counts[counts == 1]
 
@@ -167,9 +167,9 @@ else:
         else:
             res_tag = "❌ अनसीन (विंडो के बाहर) गया"
 
-        st.success(f"**03:30 PM क्लोजिंग भाव:** {close_price:.2f} (दशमलव: **.{close_dec}**) | **स्टेटस:** {res_tag}")
+        st.success(f"**अंतिम क्लोजिंग भाव:** {close_price:.2f} (दशमलव: **.{close_dec}**) | **स्टेटस:** {res_tag}")
     else:
-        st.info("ℹ️ बाजार अभी खुला है या सत्र की अंतिम क्लोजिंग नहीं आई है। क्लोजिंग वेरिफिकेशन 03:30 PM पर एक्टिव होगा।")
+        st.info("ℹ️ बाजार अभी खुला है या सत्र की अंतिम क्लोजिंग नहीं आई है। क्लोजिंग वेरिफिकेशन क्लोज टाइम पर एक्टिव होगा।")
 
 # =========================================================================
 # 📅 7-दिवसीय पूर्ण ऐतिहासिक ऑडिट टेबल (History Table)
