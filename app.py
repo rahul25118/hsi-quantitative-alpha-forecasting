@@ -5,29 +5,29 @@ import numpy as np
 from datetime import datetime
 import pytz
 
-st.set_page_config(page_title="Multi-Index Decimal & Add-On Engine", layout="wide")
+st.set_page_config(page_title="Multi-Index Decimal Engine", layout="wide")
 
 # साइडबार
 st.sidebar.header("⚙️ सेटिंग्स")
-index_choice = st.sidebar.selectbox("इंडेक्स चुनें:", ["HANG SENG", "NIFTY 50", "TAIEX (Taiwan)"])
+index_choice = st.sidebar.selectbox("इंडेक्स चुनें:", ["NIFTY 50", "HANG SENG", "TAIEX (Taiwan)"])
 ist = pytz.timezone("Asia/Kolkata")
 now_ist = datetime.now(ist)
 st.sidebar.info(f"🕒 वर्तमान IST: {now_ist.strftime('%Y-%m-%d %H:%M:%S')}")
 
-if index_choice == "HANG SENG":
-    ticker_primary = "^HSI"
-    ticker_backup = "2800.HK"
-    total_possible = 100
-    win_start, win_end = "12:00:00", "13:00:00"
-    close_time_str = "13:28:00"
-    window_label = "12:00–01:00 PM IST (क्लोजिंग 01:30 PM)"
-elif index_choice == "NIFTY 50":
+if index_choice == "NIFTY 50":
     ticker_primary = "^NSEI"
     ticker_backup = "NIFTYBEES.NS"
     total_possible = 20
     win_start, win_end = "14:00:00", "15:00:00"
     close_time_str = "15:25:00"
     window_label = "02:00–03:00 PM IST (क्लोजिंग 03:30 PM)"
+elif index_choice == "HANG SENG":
+    ticker_primary = "^HSI"
+    ticker_backup = "2800.HK"
+    total_possible = 100
+    win_start, win_end = "12:00:00", "13:00:00"
+    close_time_str = "13:28:00"
+    window_label = "12:00–01:00 PM IST (क्लोजिंग 01:30 PM)"
 else:  # TAIEX
     ticker_primary = "^TWII"
     ticker_backup = "0050.TW"
@@ -76,166 +76,187 @@ else:
     all_possible = [f"{x:02d}" for x in range(100)]
 
 # =========================================================================
-# 🇭🇰 HANG SENG DEDICATED ENGINE + ADD-ON MODULE
+# 🇮🇳 NIFTY 50 DEDICATED ENGINE (पूर्ववत मूल लेआउट - बिल्कुल अपरिवर्तित)
 # =========================================================================
-if index_choice == "HANG SENG":
-    st.title("🎯 HSI Prediction System + Single/15-Number Add-On")
-    st.caption("मौजूदा टाइम-स्लॉट विश्लेषण के आधार पर नया Single Candidate व 15-Number Filter Add-On।")
-
-    # -------------------------------------------------------------
-    # 🆕 ADD-ON MODULE SECTION (TOP OF HSI DASHBOARD)
-    # -------------------------------------------------------------
-    st.markdown("## 🧩 Add-On Module: Single Candidate & 15-Number Filters")
-    st.caption("सुबह (07:00–09:30 AM) और दोपहर (12:30–01:30 PM) के ऐतिहासिक ऑडिट निष्कर्षों पर आधारित:")
-
-    # 1. Single Candidates Cards
-    c_m, c_a, c_c = st.columns(3)
-    with c_m:
-        st.metric(
-            label="🌅 सुबह का Candidate (07:00–09:30 AM)",
-            value=".78",
-            delta="2/31 Hits (6.45% vs 1% Baseline)",
-            help="सुबह के स्लॉट में 2 बार आने वाला एकमात्र नंबर।"
-        )
-    with c_a:
-        st.metric(
-            label="☀️ दोपहर का Candidate (12:30–01:30 PM)",
-            value=".29",
-            delta="कमजोर (टाई/नो क्लियर विनर)",
-            delta_color="off",
-            help="12:30-1:30 PM में सभी नंबर 1-1 बार आए। पूरे दोपहर सत्र में केवल .29 दो बार दिखा।"
-        )
-    with c_c:
-        st.metric(
-            label="⚖️ Combined Candidate (समग्र)",
-            value=".78",
-            delta="ओवरऑल 2 Hits (6.45%)",
-            help="सुबह व दोपहर दोनों स्लॉट्स में सक्रिय रहने वाला नंबर।"
-        )
-
-    # 2. 15-Number Filters Display
-    st.markdown("### 🔢 15-Number Filter Sets")
-
-    m_15_set = [".78", ".72", ".17", ".22", ".20", ".35", ".79", ".50", ".56", ".51", ".09", ".13", ".75", ".29", ".47"]
-    a_15_set = [".21", ".31", ".47", ".63", ".78", ".51", ".50", ".17", ".72", ".29", ".71", ".75", ".56", ".22", ".12"]
-    comb_15_set = [".78", ".29", ".17", ".72", ".22", ".50", ".51", ".56", ".47", ".75", ".12", ".21", ".31", ".63", ".35"]
-
-    t1, t2, t3 = st.tabs(["🌅 सुबह का 15-नंबर सेट", "☀️ दोपहर का 15-नंबर सेट", "⚖️ Combined 15-नंबर सेट"])
-    with t1:
-        st.markdown("**सुबह के 15 नंबर (07:00–09:30 AM IST):**")
-        st.write("  •  ".join([f"`{x}`" for x in m_15_set]))
-        st.caption("ऐतिहासिक इन-सैंपल कवरेज: 17/31 (54.8%) | बेसलाइन: 15%")
-    with t2:
-        st.markdown("**दोपहर के 15 नंबर (12:30–01:30 PM IST):**")
-        st.write("  •  ".join([f"`{x}`" for x in a_15_set]))
-        st.caption("ऐतिहासिक इन-सैंपल कवरेज: 18/31 (58.1%) | बेसलाइन: 15%")
-    with t3:
-        st.markdown("**Combined 15-नंबर सेट (Overlap + Recency):**")
-        st.write("  •  ".join([f"`{x}`" for x in comb_15_set]))
-        st.caption("10 ओवरलैप नंबर + 5 उच्चतम सक्रिय नंबर | इन-सैंपल: 18/31 (58.1%)")
-
-    # 3. Statistical Baseline Comparison Table
-    st.markdown("### 📊 Statistical Validation & Baseline Comparison")
-    st.caption("यूनिफॉर्म रैंडम बेसलाइन बनाम इन-सैंपल व आउट-ऑफ-सैंपल सांख्यिकीय वास्तविकता:")
-
-    validation_data = [
-        {
-            "समय": "सुबह (07:00–09:30)",
-            "Single Candidate": ".78",
-            "15-Number Filter": ", ".join(m_15_set),
-            "Historical Hits": "17 / 31",
-            "Hit Rate": "54.84%",
-            "Evidence": "कमजोर (केवल .78 दो बार आया; आउट-ऑफ-सैंपल में कोई बढ़त नहीं)"
-        },
-        {
-            "समय": "दोपहर (12:30–01:30)",
-            "Single Candidate": ".29 (कमजोर)",
-            "15-Number Filter": ", ".join(a_15_set),
-            "Historical Hits": "18 / 31",
-            "Hit Rate": "58.06%",
-            "Evidence": "अत्यंत कमजोर (12:30-1:30 में सभी 1x टाई; .29 केवल 10:30-1:30 में 2x)"
-        },
-        {
-            "समय": "Combined (समग्र)",
-            "Single Candidate": ".78",
-            "15-Number Filter": ", ".join(comb_15_set),
-            "Historical Hits": "18 / 31",
-            "Hit Rate": "58.06%",
-            "Evidence": "ओवरफिटिंग (आउट-ऑफ-सैंपल वॉक-फॉरवर्ड में गिरकर 6.67% रह गया)"
-        }
-    ]
-    st.dataframe(pd.DataFrame(validation_data), use_container_width=True)
-
-    st.markdown("---")
-    # -------------------------------------------------------------
-    # 🔍 DAILY SESSION AUDIT & CLOSE VERIFICATION
-    # -------------------------------------------------------------
-    st.subheader(f"📅 दैनिक विश्लेषण: {selected_date}")
+if index_choice == "NIFTY 50":
+    st.title("🎯 NIFTY 50 Priority Grid & Pools Engine")
+    st.caption("02:00–03:00 PM IST विंडो: Top-15 कार्ड्स ऊपर, और नीचे कॉमन, यूनिक व अनसीन के संपूर्ण पूल्स।")
+    st.info(f"📌 सक्रिय सत्र: **{selected_date}** | विंडो: **{window_label}**")
 
     if len(win_df) < 5:
-        st.warning("⚠️ दोपहर विंडो का पर्याप्त डेटा उपलब्ध नहीं है।")
+        st.warning(f"⚠️ {window_label} के लिए पर्याप्त इंट्राडे डेटा अभी उपलब्ध नहीं हुआ है।")
     else:
+        counts = win_df["Decimal"].value_counts()
+        top15_common = counts.head(15)
+        common_pool = counts[counts >= 2]
+        unique_pool = counts[counts == 1]
+        unseen_pool = sorted(list(set(all_possible) - set(counts.index)))
+
+        # 1. Top-15 कार्ड्स
+        st.markdown("---")
+        st.markdown("### ⭐ 02:00–03:00 PM के Top-15 प्राथमिकता दशमलव")
+        st.caption("विंडो में सर्वाधिक बार रिकॉर्ड किए गए 15 दशमलव:")
+
+        for row_idx in range(3):
+            cols = st.columns(5)
+            for col_idx in range(5):
+                idx = row_idx * 5 + col_idx
+                with cols[col_idx]:
+                    if idx < len(top15_common):
+                        dec_val = top15_common.index[idx]
+                        rep_cnt = top15_common.iloc[idx]
+                        st.metric(
+                            label=f"रैंक #{idx+1}",
+                            value=f".{dec_val}",
+                            delta=f"{rep_cnt} बार आया"
+                        )
+                    else:
+                        st.metric(label=f"रैंक #{idx+1}", value="-", delta="उपलब्ध नहीं")
+
+        # 2. संपूर्ण पूल्स विभाजन
+        st.markdown("---")
+        st.markdown("### 📋 संपूर्ण पूल्स विभाजन (Complete Decimals Breakdown)")
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            st.markdown(f"#### 🔄 कॉमन पूल ({len(common_pool)} अंक)")
+            st.caption("विंडो में $\ge 2	imes$ रिपीट हुए:")
+            if not common_pool.empty:
+                st.write(", ".join([f".{k} ({v}x)" for k, v in common_pool.items()]))
+            else:
+                st.write("कोई कॉमन नंबर नहीं।")
+
+        with c2:
+            st.markdown(f"#### ⚡ यूनिक पूल ({len(unique_pool)} अंक)")
+            st.caption("विंडो में सिर्फ $1	imes$ आए:")
+            if not unique_pool.empty:
+                st.write(", ".join([f".{k}" for k in sorted(unique_pool.index)]))
+            else:
+                st.write("कोई यूनिक नंबर नहीं।")
+
+        with c3:
+            st.markdown(f"#### 🚫 अनसीन पूल ({len(unseen_pool)} अंक)")
+            st.caption("विंडो में एक बार भी नहीं दिखे (बाहर रहे):")
+            st.write(", ".join([f".{k}" for k in unseen_pool]))
+
+        # 3. क्लोजिंग सत्यापन
+        st.markdown("---")
+        last_bar_time = day_df.index[-1].time()
+        is_today = (selected_date == datetime.now(ist).date())
         target_close_time = datetime.strptime(close_time_str, "%H:%M:%S").time()
-        bars_before_target = day_df[day_df.index.time <= target_close_time]
 
-        if not bars_before_target.empty and len(bars_before_target) >= 10:
-            close_bar = bars_before_target.iloc[-1]
-            close_price = close_bar["Close"]
-            close_dec = close_bar["Decimal"]
-            formatted_dec = f".{close_dec}"
+        if not is_today or last_bar_time >= target_close_time:
+            close_price = day_df.iloc[-1]["Close"]
+            close_dec = day_df.iloc[-1]["Decimal"]
 
-            # Check matches with Add-On candidates
-            is_single_hit = (formatted_dec == ".78")
-            is_comb15_hit = (formatted_dec in comb_15_set)
+            if close_dec in top15_common.index:
+                rank_hit = list(top15_common.index).index(close_dec) + 1
+                res_tag = f"✅ Top-15 में मैच हुआ! (रैंक #{rank_hit})"
+            elif close_dec in common_pool.index:
+                res_tag = "🟡 कॉमन पूल में आया (Top-15 से बाहर)"
+            elif close_dec in unique_pool.index:
+                res_tag = "🔵 यूनिक पूल में आया"
+            else:
+                res_tag = "❌ अनसीन (विंडो के बाहर) गया"
 
-            c_res1, c_res2 = st.columns(2)
-            with c_res1:
-                if is_single_hit:
-                    st.success(f"**Single Candidate (.78):** ✅ सटीक मैच हुआ! क्लोजिंग भाव: {close_price:.2f}")
-                else:
-                    st.error(f"**Single Candidate (.78):** ❌ मिस! क्लोजिंग दशमलव `{formatted_dec}` रहा।")
-            with c_res2:
-                if is_comb15_hit:
-                    pos = comb_15_set.index(formatted_dec) + 1
-                    st.success(f"**Combined 15-Filter:** ✅ मैच! (रैंक #{pos}) भाव: {close_price:.2f}")
-                else:
-                    st.error(f"**Combined 15-Filter:** ❌ मिस! `{formatted_dec}` फिल्टर से बाहर रहा।")
+            st.success(f"**03:30 PM क्लोजिंग भाव:** {close_price:.2f} (दशमलव: **.{close_dec}**) | **स्टेटस:** {res_tag}")
         else:
-            st.info("ℹ️ 01:30 PM की क्लोजिंग अभी नहीं आई है या बाजार खुला है।")
+            st.info("ℹ️ बाजार अभी खुला है या 03:30 PM की क्लोजिंग नहीं आई है।")
 
-    # -------------------------------------------------------------
-    # 📋 7-DAY AUDIT TABLE
-    # -------------------------------------------------------------
+    # 4. 7-दिवसीय हिस्ट्री
     st.markdown("---")
-    st.markdown("### 📋 पिछले 7 कारोबारी दिनों का Add-On परफॉर्मेंस ऑडिट")
+    st.markdown("### 📋 पिछले 7 कारोबारी दिनों का NIFTY समग्र सारांश")
     history_rows = []
     for d in available_dates[:7]:
         d_df = df_all[df_all["Date"] == d].copy()
-        target_bars = d_df[d_df.index.time <= datetime.strptime(close_time_str, "%H:%M:%S").time()]
-        if len(d_df) < 15 or target_bars.empty:
+        w_df = d_df.between_time(win_start, win_end).copy()
+        if len(w_df) < 5 or len(d_df) < 15:
             continue
-        c_dec = f".{target_bars.iloc[-1]['Decimal']}"
-        c_price = target_bars.iloc[-1]["Close"]
+        c_dec = d_df.iloc[-1]["Decimal"]
+        c_price = d_df.iloc[-1]["Close"]
+        w_counts = w_df["Decimal"].value_counts()
+        t15 = w_counts.head(15).index.tolist()
 
-        hit_single = "✅ हिट" if c_dec == ".78" else "❌ मिस"
-        hit_15 = "✅ हिट" if c_dec in comb_15_set else "❌ मिस"
+        if c_dec in t15:
+            r_pos = t15.index(c_dec) + 1
+            outcome = f"✅ Top-15 मैच (रैंक #{r_pos})"
+        elif c_dec in w_counts.index:
+            outcome = "🟡 सीन (Top-15 बाहर)"
+        else:
+            outcome = "❌ अनसीन (बाहर)"
 
         history_rows.append({
             "तारीख": str(d),
             "क्लोजिंग भाव": f"{c_price:.2f}",
-            "क्लोज दशमलव": c_dec,
-            "Single (.78)": hit_single,
-            "Combined 15 Filter": hit_15
+            "क्लोज दशमलव": f".{c_dec}",
+            "Top-15 नंबर्स": ", ".join([f".{x}" for x in t15]),
+            "परिणाम": outcome
         })
 
     if history_rows:
         st.dataframe(pd.DataFrame(history_rows), use_container_width=True)
 
 # =========================================================================
-# NIFTY & TAIEX DEFAULT LAYOUT (यथावत सुरक्षित)
+# 🇭🇰 HANG SENG DEDICATED ENGINE + ADD-ON MODULE
+# =========================================================================
+elif index_choice == "HANG SENG":
+    st.title("🎯 HSI Prediction System + Single/15-Number Add-On")
+    st.caption("मौजूदा टाइम-स्लॉट विश्लेषण के आधार पर नया Single Candidate व 15-Number Filter Add-On।")
+
+    st.markdown("## 🧩 Add-On Module: Single Candidate & 15-Number Filters")
+    c_m, c_a, c_c = st.columns(3)
+    with c_m:
+        st.metric("🌅 सुबह का Candidate (07:00–09:30 AM)", ".78", "2/31 Hits (6.45% vs 1% Baseline)")
+    with c_a:
+        st.metric("☀️ दोपहर का Candidate (12:30–01:30 PM)", ".29", "कमजोर (टाई/नो क्लियर विनर)", delta_color="off")
+    with c_c:
+        st.metric("⚖️ Combined Candidate (समग्र)", ".78", "ओवरऑल 2 Hits (6.45%)")
+
+    st.markdown("### 🔢 15-Number Filter Sets")
+    m_15_set = [".78", ".72", ".17", ".22", ".20", ".35", ".79", ".50", ".56", ".51", ".09", ".13", ".75", ".29", ".47"]
+    a_15_set = [".21", ".31", ".47", ".63", ".78", ".51", ".50", ".17", ".72", ".29", ".71", ".75", ".56", ".22", ".12"]
+    comb_15_set = [".78", ".29", ".17", ".72", ".22", ".50", ".51", ".56", ".47", ".75", ".12", ".21", ".31", ".63", ".35"]
+
+    t1, t2, t3 = st.tabs(["🌅 सुबह का 15-नंबर सेट", "☀️ दोपहर का 15-नंबर सेट", "⚖️ Combined 15-नंबर सेट"])
+    with t1:
+        st.write("  •  ".join([f"`{x}`" for x in m_15_set]))
+        st.caption("ऐतिहासिक इन-सैंपल कवरेज: 17/31 (54.8%) | बेसलाइन: 15%")
+    with t2:
+        st.write("  •  ".join([f"`{x}`" for x in a_15_set]))
+        st.caption("ऐतिहासिक इन-सैंपल कवरेज: 18/31 (58.1%) | बेसलाइन: 15%")
+    with t3:
+        st.write("  •  ".join([f"`{x}`" for x in comb_15_set]))
+        st.caption("10 ओवरलैप + 5 सक्रिय नंबर | इन-सैंपल: 18/31 (58.1%)")
+
+    st.markdown("---")
+    st.subheader(f"📅 दैनिक विश्लेषण: {selected_date}")
+    target_close_time = datetime.strptime(close_time_str, "%H:%M:%S").time()
+    bars_before_target = day_df[day_df.index.time <= target_close_time]
+
+    if not bars_before_target.empty and len(bars_before_target) >= 10:
+        close_bar = bars_before_target.iloc[-1]
+        close_price = close_bar["Close"]
+        close_dec = f".{close_bar['Decimal']}"
+        c_res1, c_res2 = st.columns(2)
+        with c_res1:
+            if close_dec == ".78":
+                st.success(f"**Single Candidate (.78):** ✅ सटीक मैच! भाव: {close_price:.2f}")
+            else:
+                st.error(f"**Single Candidate (.78):** ❌ मिस! दशमलव `{close_dec}` रहा।")
+        with c_res2:
+            if close_dec in comb_15_set:
+                pos = comb_15_set.index(close_dec) + 1
+                st.success(f"**Combined 15-Filter:** ✅ मैच! (रैंक #{pos}) भाव: {close_price:.2f}")
+            else:
+                st.error(f"**Combined 15-Filter:** ❌ मिस! `{close_dec}` फिल्टर से बाहर रहा।")
+    else:
+        st.info("ℹ️ 01:30 PM की क्लोजिंग अभी नहीं आई है या बाजार खुला है।")
+
+# =========================================================================
+# TAIEX DEFAULT LAYOUT
 # =========================================================================
 else:
-    st.title(f"🎯 {index_choice} Priority Engine")
+    st.title("🎯 TAIEX Priority Engine")
     st.caption(f"{window_label} का विश्लेषण।")
     if len(win_df) < 5:
         st.warning("पर्याप्त डेटा उपलब्ध नहीं है।")
